@@ -4,17 +4,19 @@ const bodyParser = require("body-parser");
 const { default: axios } = require("axios");
 const fs = require("fs");
 const mysql = require("mysql2/promise");
+require("dotenv").config();
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cors());
+const port = process.env.PORT;
 
 const db = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "root",
-  database: "geolookup",
+  host: process.env.HOST,
+  user: process.env.USER,
+  password: process.env.PASSWORD,
+  database: process.env.DATABASE,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -52,7 +54,7 @@ app.get("/reverse-geocode", async (req, res) => {
           "https://api.longdo.com/map/services/address",
           {
             params: {
-              key: "bf987ce1661f73a4b887cb341d25963c",
+              key: process.env.KEY,
               lon: location.lon,
               lat: location.lat,
             },
@@ -104,4 +106,4 @@ app.get("/reverse-geocode", async (req, res) => {
   }
 });
 
-app.listen(3001, () => console.log(`🚀 Server is running on port 3001`));
+app.listen(port, () => console.log(`Server is running on port ${port}`));
