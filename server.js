@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { default: axios } = require("axios");
+const fs = require("fs");
 const mysql = require("mysql2/promise");
 
 const app = express();
@@ -53,6 +54,11 @@ app.get("/reverse-geocode", async (req, res) => {
         }
       })
     );
+    fs.writeFileSync(
+      "geocode_results.json",
+      JSON.stringify(result, null, 2),
+      "utf8"
+    );
 
     res.status(200).json({ message: "success", data: result });
   } catch (err) {
@@ -61,3 +67,4 @@ app.get("/reverse-geocode", async (req, res) => {
 });
 
 app.listen(3001, () => console.log(`Server is Running Port : 3001`));
+
