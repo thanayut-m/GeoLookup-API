@@ -48,7 +48,7 @@ exports.query_db = async (query, type = "host") => {
     const [rows] = await connection.query(query);
 
     connection.release();
-    console.log(`Query executed: ${query}`);
+    // console.log(`Query executed: ${query}`);
 
     if (query.toLowerCase().startsWith("select")) {
       return rows;

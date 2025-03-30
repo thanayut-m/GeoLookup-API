@@ -3,9 +3,9 @@ const { query_db } = require("./ConnectSQL");
 
 exports.syncData = async () => {
   try {
-    const dbHost = await query_db("select id,lon,lat from locations", "host");
-    const dbclient = await query_db(
-      "select location_c_id from location_c",
+    const dbHost = await query_db("SELECT id, lon, lat FROM locations", "host");
+    const dbClient = await query_db(
+      "SELECT location_c_id FROM location_c",
       "client"
     );
 
@@ -13,17 +13,27 @@ exports.syncData = async () => {
       throw new Error("No data found in HOST database.");
     }
 
-    if (!dbclient || dbclient.length === 0) {
+    if (!dbClient) {
       console.log("No data found in CLIENT database. Starting sync with HOST.");
     }
 
-    for (const hostRecord of dbHost) {
-      const clientRecord = dbclient.find(
-        (record) => record.location_c_id === hostRecord.id
-      );
+    const clientIds = new Set(dbClient.map((record) => record.location_c_id));
 
-      if (!clientRecord) {
-        console.log(`ID : ${hostRecord.id} does not exist in CLIENT.`);
+    if (dbClient.length === dbHost.length) {
+      console.log(
+        "CLIENT database is already in sync with HOST. Running reqMap()."
+      );
+      reqMap();
+      return;
+    }
+
+    let newRecords = 0;
+
+    for (const hostRecord of dbHost) {
+      if (!clientIds.has(hostRecord.id)) {
+        console.log(
+          `ID : ${hostRecord.id} does not exist in CLIENT. Adding...`
+        );
 
         if (!hostRecord.id || !hostRecord.lon || !hostRecord.lat) {
           console.log(`Skipping ID ${hostRecord.id} due to missing data.`);
@@ -42,6 +52,7 @@ exports.syncData = async () => {
             console.log(
               `ID : ${hostRecord.id} inserted successfully into CLIENT.`
             );
+            newRecords++;
           } else {
             console.log(`Failed to insert ID : ${hostRecord.id} into CLIENT.`);
           }
@@ -50,10 +61,21 @@ exports.syncData = async () => {
             `Error inserting ID ${hostRecord.id}: ${error.message}`
           );
         }
-      } else {
-        console.log(`ID : ${hostRecord.id} already exists in CLIENT.`);
-        reqMap();
       }
+    }
+
+    console.log(`Sync completed. ${newRecords} new records added.`);
+
+    const updatedClient = await query_db(
+      "SELECT location_c_id FROM location_c",
+      "client"
+    );
+
+    if (updatedClient.length === dbHost.length) {
+      console.log(
+        "CLIENT database is now fully synced with HOST. Running reqMap()."
+      );
+      reqMap();
     }
   } catch (error) {
     console.log(`ERROR : ${error.message}`);

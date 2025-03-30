@@ -1,98 +1,79 @@
+const { default: axios } = require("axios");
 const { query_db } = require("../func/ConnectSQL");
 
 exports.reqMap = async () => {
   try {
     console.log("reqMap");
+
     const send_track = await query_db(
-      `select location_c_id, location_c_lat,location_c_lon, location_c_send_longdo, location_c_subdistrict, location_c_district, location_c_province, location_c_postcode from location_c where location_c_send_longdo <> "Y" or location_c_send_longdo is null`,
+      `SELECT location_c_id, location_c_lat, location_c_lon, location_c_send_longdo 
+       FROM location_c 
+       WHERE location_c_send_longdo <> 'Y' OR location_c_send_longdo IS NULL`,
       "client"
     );
-    const locations = await query_db(query, "client");
-    console.log(locations.location_c_id);
 
-    // return locations;
-    // app.get("/reverse-geocode", async (req, res) => {
-    //   try {
-    //     const [rows] = await db.query("SELECT lon,lat FROM locations");
-    //     if (rows.length === 0) {
-    //       return res.status(404).json({ error: "Location not found" });
-    //     }
+    if (send_track.length > 0) {
+      console.log(send_track.map((location) => location.location_c_id));
 
-    //     console.log(`📍 Processing ${rows.length} locations...`);
+      for (const location of send_track) {
+        try {
+          const apiResponse = await axios.get(
+            "https://api.longdo.com/map/services/address",
+            {
+              params: {
+                key: process.env.KEY,
+                lon: location.location_c_lon,
+                lat: location.location_c_lat,
+              },
+            }
+          );
 
-    //     let successCount = 0;
-    //     let failCount = 0;
-    //     const result = [];
+          console.log(
+            `Response for ID ${location.location_c_id}:`,
+            apiResponse.data
+          );
 
-    //     for (let i = 0; i < rows.length; i++) {
-    //       const location = rows[i];
+          const { subdistrict, district, province, postcode } =
+            apiResponse.data;
 
-    //       if (!location.lon || !location.lat) {
-    //         console.warn(`⚠️ Skipping invalid data at index ${i}`);
-    //         result.push({ error: "Invalid data in database" });
-    //         failCount++;
-    //         continue;
-    //       }
+          const updateQuery = `
+            UPDATE location_c 
+            SET 
+              location_c_subdistrict = '${subdistrict || ""}', 
+              location_c_district = '${district || ""}', 
+              location_c_province = '${province || ""}', 
+              location_c_postcode = '${postcode || ""}', 
+              location_c_send_longdo = 'Y'
+            WHERE location_c_id = ${location.location_c_id}
+          `;
 
-    //       try {
-    //         await delay(i * 1000);
+          const result = await query_db(updateQuery, "client");
 
-    //         const apiResponse = await axios.get(
-    //           "https://api.longdo.com/map/services/address",
-    //           {
-    //             params: {
-    //               key: process.env.KEY,
-    //               lon: location.lon,
-    //               lat: location.lat,
-    //             },
-    //           }
-    //         );
+          if (result && result.affectedRows > 0) {
+            console.log(
+              `✅ Updated ID ${location.location_c_id} successfully.`
+            );
+          } else {
+            console.log(`❌ Failed to update ID ${location.location_c_id}.`);
+          }
+        } catch (error) {
+          if (error.response && error.response.status === 429) {
+            console.warn(
+              `⏩ Skipping ID ${location.location_c_id} due to Too Many Requests.`
+            );
+            continue;
+          }
 
-    //         if (
-    //           typeof apiResponse.data === "string" &&
-    //           apiResponse.data.includes("Too many requests")
-    //         ) {
-    //           console.error("🚨 Too many requests! Stopping process...");
-    //           throw new Error("Too many requests");
-    //         }
-
-    //         result.push({
-    //           lon: location.lon,
-    //           lat: location.lat,
-    //           address: apiResponse.data,
-    //         });
-    //         successCount++;
-    //         console.log(
-    //           `✅ Success [${successCount}/${rows.length}] - lon: ${location.lon}, lat: ${location.lat}`
-    //         );
-    //       } catch (error) {
-    //         failCount++;
-    //         console.error(
-    //           `❌ Failed [${failCount}] - lon: ${location.lon}, lat: ${location.lat}, error: ${error.message}`
-    //         );
-    //         result.push({
-    //           lon: location.lon,
-    //           lat: location.lat,
-    //           error: error.message,
-    //         });
-    //       }
-    //     }
-
-    //     fs.writeFileSync(
-    //       "geocode_results.json",
-    //       JSON.stringify(result, null, 2),
-    //       "utf8"
-    //     );
-
-    //     console.log(
-    //       `🏁 Process completed: ${successCount} success, ${failCount} failed`
-    //     );
-    //     res.status(200).json({ message: "success", data: result });
-    //   } catch (err) {
-    //     res.status(500).json({ error: err.message });
-    //   }
-    // });
+          console.error(
+            `❌ Error fetching address for ID ${location.location_c_id}:`,
+            error.message
+          );
+        }
+      }
+    } else {
+      console.log("No data found.");
+    }
   } catch (error) {
-    console.log(`ERROR : ${error.message}`);
+    console.error("❌ Unexpected error in reqMap:", error.message);
   }
 };
