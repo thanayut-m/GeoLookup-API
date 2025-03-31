@@ -12,15 +12,12 @@ const fetchAddress = async (lon, lat, retries = 3) => {
           params: { key: process.env.KEY, lon, lat },
         }
       );
-      console.log(`lon : ${lon}, lat : ${lat}`);
 
       if (
         typeof response.data === "string" &&
         response.data.includes("Too many requests")
       ) {
-        console.warn(
-          `⏩ lon : ${lon}, lat : ${lat} API limit reached, retrying in 2 seconds...`
-        );
+        console.warn(`⏩ API limit reached, retrying in 2 seconds...`);
         await delay(2000);
         continue;
       }
@@ -31,7 +28,7 @@ const fetchAddress = async (lon, lat, retries = 3) => {
         `❌ Error fetching address (Attempt ${i + 1}):`,
         error.message
       );
-      await delay(1000);
+      await delay(2000);
     }
   }
   return null;
@@ -59,19 +56,14 @@ exports.reqMap = async () => {
     for (const location of send_track) {
       try {
         const [data1, data2, data3] = await Promise.all([
-          delay(500).then(() =>
+          fetchAddress(location.location_c_lon, location.location_c_lat),
+          delay(1000).then(() =>
             fetchAddress(location.location_c_lon, location.location_c_lat)
           ),
-          delay(500).then(() =>
-            fetchAddress(location.location_c_lon, location.location_c_lat)
-          ),
-          delay(500).then(() =>
+          delay(1000).then(() =>
             fetchAddress(location.location_c_lon, location.location_c_lat)
           ),
         ]);
-        console.log(`Data1: ${JSON.stringify(data1, null, 2)}`);
-        console.log(`Data2: ${JSON.stringify(data2, null, 2)}`);
-        console.log(`Data3: ${JSON.stringify(data3, null, 2)}`);
 
         if (!data1 || !data2 || !data3) {
           console.warn(
@@ -120,7 +112,7 @@ exports.reqMap = async () => {
           console.log(`❌ Failed to update ID ${location.location_c_id}.`);
         }
 
-        await delay(500);
+        await delay(1000);
       } catch (error) {
         console.error(
           `❌ Error processing ID ${location.location_c_id}:`,
