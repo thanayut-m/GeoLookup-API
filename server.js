@@ -16,4 +16,6 @@ app.get("/connect-db", checkDatabaseConnection);
 
 syncData();
 
+setInterval(syncData, 2000);
+
 app.listen(port, () => console.log(`Server is running on port ${port}`));
